@@ -16,15 +16,17 @@ intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
 
-def create_message_body(problem_title, current_date, url):
+def create_message_body(url):
     lc_url = f"https://leetcode.com{url}"
-    message_body = f"LeetCode daily - {problem_title} - {current_date} - <{lc_url}>"
+    message_body = f"<{lc_url}>"
     print(f"Message body: '{message_body}'")
     return message_body
 
 
-def create_thread_title(problem_title, current_date):
-    thread_title = f"LeetCode daily - {problem_title} - {current_date}"
+def create_thread_title(problem_title, current_date, prob_difficulty, prob_id):
+    map = {"Easy": "🟢", "Medium": "🟡", "Hard": "🔴"}
+    difficulty_color = map[prob_difficulty]
+    thread_title = f"{difficulty_color} [Daily] {prob_id}. {problem_title}"
     print(f"Thread title: '{thread_title}'")
     return thread_title
 
@@ -52,6 +54,7 @@ def get_daily(session):
                       question {
                         difficulty
                         title
+                        questionId
                       }
                     }
                     }
@@ -66,17 +69,18 @@ def get_daily(session):
     lc_difficulty = json["data"]["activeDailyCodingChallengeQuestion"]["question"]["difficulty"]
     lc_title = json["data"]["activeDailyCodingChallengeQuestion"]["question"]["title"]
     lc_date = json["data"]["activeDailyCodingChallengeQuestion"]["date"]
-    return lc_title, lc_link, lc_difficulty, lc_date
+    lc_id = json["data"]["activeDailyCodingChallengeQuestion"]["question"]["questionId"]
+    return lc_title, lc_link, lc_difficulty, lc_date, lc_id
 
 
 session = requests.Session()
 get_csrf_token(session)
-title, link, difficulty, date = get_daily(session)
+title, link, difficulty, date, id = get_daily(session)
 
 
 async def send_message():
-    message_body = create_message_body(title, date, link)
-    thread_title = create_thread_title(title, date)
+    message_body = create_message_body(link)
+    thread_title = create_thread_title(title, date, difficulty, id)
     thread_body = create_thread_message_body(default_ping)
     channel = client.get_channel(channel_id)
     message = await channel.send(message_body)
