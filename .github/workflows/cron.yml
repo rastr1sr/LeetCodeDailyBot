@@ -23,5 +23,8 @@ jobs:
         DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
         DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
         DISCORD_DEFAULT_PING: ${{ secrets.DISCORD_DEFAULT_PING }}
+        DISCORD_EASY_PING: ${{ secrets.DISCORD_EASY_PING }}
+        DISCORD_MEDIUM_PING: ${{ secrets.DISCORD_MEDIUM_PING }}
+        DISCORD_HARD_PING: ${{ secrets.DISCORD_HARD_PING }}
       run: |
         python main.py
