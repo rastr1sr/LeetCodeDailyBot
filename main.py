@@ -53,7 +53,7 @@ def get_daily(session):
                       question {
                         difficulty
                         title
-                        questionId
+                        questionFrontendId
                       }
                     }
                     }
@@ -68,7 +68,7 @@ def get_daily(session):
     lc_difficulty = json["data"]["activeDailyCodingChallengeQuestion"]["question"]["difficulty"]
     lc_title = json["data"]["activeDailyCodingChallengeQuestion"]["question"]["title"]
     lc_date = json["data"]["activeDailyCodingChallengeQuestion"]["date"]
-    lc_id = json["data"]["activeDailyCodingChallengeQuestion"]["question"]["questionId"]
+    lc_id = json["data"]["activeDailyCodingChallengeQuestion"]["question"]["questionFrontendId"]
     return lc_title, lc_link, lc_difficulty, lc_date, lc_id
 
 
