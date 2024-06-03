@@ -50,25 +50,22 @@ def get_daily(session):
                       activeDailyCodingChallengeQuestion {
                         date
                         link
-                      question {
-                        difficulty
-                        title
-                        questionFrontendId
+                        question {
+                          difficulty
+                          questionFrontendId
+                          title
+                        }
                       }
-                    }
                     }
                     """
     data["variables"] = None
     session.headers["Referer"] = "https://leetcode.com"
-    session.headers['X-CSRFToken'] = session.cookies.get("csrftoken")
+    session.headers["X-CSRFToken"] = session.cookies.get("csrftoken")
     response = session.post(lc_url, data=data)
-    json = response.json()
+    lc_data = response.json()["data"]["activeDailyCodingChallengeQuestion"]
 
-    lc_link = json["data"]["activeDailyCodingChallengeQuestion"]["link"]
-    lc_difficulty = json["data"]["activeDailyCodingChallengeQuestion"]["question"]["difficulty"]
-    lc_title = json["data"]["activeDailyCodingChallengeQuestion"]["question"]["title"]
-    lc_date = json["data"]["activeDailyCodingChallengeQuestion"]["date"]
-    lc_id = json["data"]["activeDailyCodingChallengeQuestion"]["question"]["questionFrontendId"]
+    lc_date, lc_link, lc_question = lc_data["date"], lc_data["link"], lc_data["question"]
+    lc_difficulty, lc_id, lc_title = lc_question["difficulty"], lc_question["questionFrontendId"], lc_question["title"]
     return lc_title, lc_link, lc_difficulty, lc_date, lc_id
 
 
