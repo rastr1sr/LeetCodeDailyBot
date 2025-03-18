@@ -1,91 +1,131 @@
-from datetime import datetime
-from dotenv import load_dotenv
-from os import environ
-
 import discord
 import requests
+import asyncio
+import os
+from dotenv import load_dotenv
 
 load_dotenv()
+TOKEN = os.getenv("DISCORD_TOKEN")
+CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
 
-token = environ["DISCORD_TOKEN"]
-channel_id = int(environ["DISCORD_CHANNEL_ID"])
-default_ping = environ["DISCORD_DEFAULT_PING"]
-easy_ping = environ["DISCORD_EASY_PING"]
-medium_ping = environ["DISCORD_MEDIUM_PING"]
-hard_ping = environ["DISCORD_HARD_PING"]
+DIFFICULTY_COLORS = {
+    "Easy": 0x00FF00,  # Green
+    "Medium": 0xFFFF00,  # Yellow
+    "Hard": 0xFF0000    # Red
+}
 
-difficulty_pings = {"Easy": easy_ping, "Medium": medium_ping, "Hard": hard_ping}
+DIFFICULTY_EMOJIS = {
+    "Easy": "🟢",
+    "Medium": "🟡",
+    "Hard": "🔴"
+}
 
+class LeetCodeCronBot(discord.Client):
+    def __init__(self):
+        intents = discord.Intents.default()
+        super().__init__(intents=intents)
+        self.session = requests.Session()
+        
+    async def setup_hook(self):
+        self.bg_task = self.loop.create_task(self.post_and_exit())
+    
+    async def post_and_exit(self):
+        await self.wait_until_ready()
+        
+        try:
+            problem_data = self.get_daily_problem()
+            if not problem_data:
+                print("Failed to get daily problem. Exiting.")
+                await self.close()
+                return
+                
+            title, link, difficulty, date, prob_id = problem_data
 
-intents = discord.Intents.default()
-client = discord.Client(intents=intents)
+            channel = self.get_channel(CHANNEL_ID)
+            if not channel:
+                print(f"Channel {CHANNEL_ID} not found. Exiting.")
+                await self.close()
+                return
 
+            embed = discord.Embed(
+                title=f"{prob_id}. {title}",
+                url=f"https://leetcode.com{link}",
+                color=DIFFICULTY_COLORS.get(difficulty, 0x808080)
+            )
+            embed.add_field(name="Difficulty", value=difficulty, inline=True)
 
-def create_message_body(url, ping, diff):
-    lc_url = f"https://leetcode.com{url}"
-    message_body = f"<{lc_url}>" + "\n" + f"<@&{ping}>, <@&{difficulty_pings.get(diff)}>"
-    print(f"Message body: '{message_body}'")
-    return message_body
+            thread_title = self.format_thread_title(title, difficulty, prob_id)
 
+            print(f"Posting problem: {thread_title}")
+            message = await channel.send(embed=embed)
 
-def create_thread_title(problem_title, current_date, prob_difficulty, prob_id):
-    map = {"Easy": "🟢", "Medium": "🟡", "Hard": "🔴"}
-    difficulty_color = map[prob_difficulty]
-    thread_title = f"{difficulty_color} [Daily] {prob_id}. {problem_title}"
-    print(f"Thread title: '{thread_title}'")
-    return thread_title
+            await message.create_thread(name=thread_title)
+            print("Daily challenge posted successfully")
+            
+        except Exception as e:
+            print(f"Error: {str(e)}")
+        finally:
 
+            await self.close()
+    
+    def get_daily_problem(self):
+        try:
+            self.session.get("https://leetcode.com/graphql")
+            csrf_token = self.session.cookies.get("csrftoken")
 
-def get_csrf_token(session):
-    response = session.get("https://leetcode.com/graphql")
-    print(response.cookies.get_dict())
-
-
-def get_daily(session):
-    lc_url = "https://leetcode.com/graphql"
-    data = {}
-    data["operationName"] = "questionOfToday"
-    data["query"] = """
-                    query questionOfToday {
-                      activeDailyCodingChallengeQuestion {
+            self.session.headers.update({
+                "Referer": "https://leetcode.com",
+                "X-CSRFToken": csrf_token,
+                "Content-Type": "application/json"
+            })
+            
+            query = """
+                query questionOfToday {
+                    activeDailyCodingChallengeQuestion {
                         date
                         link
                         question {
-                          difficulty
-                          questionFrontendId
-                          title
+                            difficulty
+                            questionFrontendId
+                            title
                         }
-                      }
                     }
-                    """
-    data["variables"] = None
-    session.headers["Referer"] = "https://leetcode.com"
-    session.headers["X-CSRFToken"] = session.cookies.get("csrftoken")
-    response = session.post(lc_url, data=data)
-    lc_data = response.json()["data"]["activeDailyCodingChallengeQuestion"]
+                }
+            """
+            
+            response = self.session.post(
+                "https://leetcode.com/graphql",
+                json={
+                    "operationName": "questionOfToday",
+                    "query": query,
+                    "variables": {}
+                }
+            )
+            
+            if response.status_code != 200:
+                print(f"API error: {response.status_code}")
+                return None
+            
+            data = response.json()
+            challenge = data.get("data", {}).get("activeDailyCodingChallengeQuestion", {})
+            question = challenge.get("question", {})
+            
+            return (
+                question.get("title"),
+                challenge.get("link"),
+                question.get("difficulty"),
+                challenge.get("date"),
+                question.get("questionFrontendId")
+            )
+            
+        except Exception as e:
+            print(f"Error getting problem: {str(e)}")
+            return None
+    
+    def format_thread_title(self, title, difficulty, prob_id):
+        emoji = DIFFICULTY_EMOJIS.get(difficulty, "⚪")
+        return f"{emoji} [Daily] {prob_id}. {title}"
 
-    lc_date, lc_link, lc_question = lc_data["date"], lc_data["link"], lc_data["question"]
-    lc_difficulty, lc_id, lc_title = lc_question["difficulty"], lc_question["questionFrontendId"], lc_question["title"]
-    return lc_title, lc_link, lc_difficulty, lc_date, lc_id
-
-
-session = requests.Session()
-get_csrf_token(session)
-title, link, difficulty, date, id = get_daily(session)
-
-
-async def send_message():
-    message_body = create_message_body(link, default_ping, difficulty)
-    thread_title = create_thread_title(title, date, difficulty, id)
-    channel = client.get_channel(channel_id)
-    message = await channel.send(message_body)
-    await message.create_thread(name=thread_title)
-    await client.close()
-
-
-@client.event
-async def on_ready():
-    await send_message()
-
-
-client.run(token)
+if __name__ == "__main__":
+    client = LeetCodeCronBot()
+    client.run(TOKEN)
