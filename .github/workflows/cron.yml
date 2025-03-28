@@ -1,37 +1,47 @@
-name: Run Python Bot
+name: Run LeetCode Daily Bot
 
 on:
   workflow_dispatch:
   schedule:
     - cron: '10 0 * * *'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  run_bot:
+    name: Fetch and Post LeetCode Daily
     runs-on: ubuntu-latest
-    
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Set up Python 3.10
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      - name: Cache Python dependencies
-        uses: actions/cache@v3
+
+      - name: Cache Python dependencies (pip)
+        uses: actions/cache@v4
+        id: cache-pip
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-      - name: Install dependencies
+
+      - name: Install Python dependencies
         run: |
           python -m venv venv
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Run script
+
+      - name: Run LeetCode Bot script
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
         run: |
-          source venv/bin/activate
-          python main.py
+          ./venv/bin/python main.py
