@@ -3,6 +3,7 @@ import aiohttp
 import asyncio
 import os
 import logging
+import sys
 from dotenv import load_dotenv
 from dataclasses import dataclass
 from typing import Optional
@@ -192,6 +193,9 @@ class LeetCodeCronBot(discord.Client):
             message = await target_channel.send(embed=embed)
             await message.create_thread(name=thread_title, auto_archive_duration=self.config.thread_archive_duration)
             logger.info(f"Successfully posted and created thread: '{thread_title}'")
+            
+            logger.info("Work complete. Forcing immediate exit to prevent hanging.")
+            sys.exit(0)
 
         except discord.Forbidden:
             logger.error(f"Missing permissions to send message or create thread in channel {self.config.channel_id}.")
